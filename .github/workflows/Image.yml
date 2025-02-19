@@ -1,0 +1,39 @@
+name: docker image
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build the Docker Image
+        run: docker build . --file Dockerfile --tag shadimd/shadi-mohammad-devops:${{ github.run_number }}-${{ github.sha }}
+
+      - name: Login to Docker Hub
+        run: echo ${{ secrets.DOCKER_HUB_PASS }} | docker login -u ${{ secrets.DOCKER_HUB_USER }} --password-stdin
+
+      - name: Push Docker Image to Registry
+        run: docker push shadimd/shadi-mohammad-devops:${{ github.run_number }}-${{ github.sha }}
+
+      - name: Install SonarScanner
+        run: |
+          sudo apt update
+          sudo apt install -y unzip
+          wget -O sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+          unzip sonar-scanner.zip
+          sudo mv sonar-scanner-5.0.1.3006-linux /opt/sonar-scanner
+          echo "export PATH=$PATH:/opt/sonar-scanner/bin" >> ~/.bashrc
+          source ~/.bashrc
+
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: /opt/sonar-scanner/bin/sonar-scanner -Dsonar.login=$SONAR_TOKEN
